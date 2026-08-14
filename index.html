@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Lost & Found</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        h1 {
+            color: #d97706;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            color: #6b7280;
+            margin-top: 0;
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            max-width: 1200px;
+            margin: 0 auto 30px auto;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .search-input, .filter-select {
+            padding: 10px 15px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            background-color: white;
+        }
+        .search-input {
+            flex-grow: 1;
+            max-width: 400px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: transform 0.2s ease;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+        }
+        .card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background-color: #e5e7eb;
+        }
+        .status-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .status-unclaimed { background-color: #f59e0b; }
+        .status-claimed { background-color: #10b981; }
+        
+        .card-content {
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+        .card-title {
+            margin: 0 0 10px 0;
+            font-size: 1.25rem;
+            color: #1f2937;
+        }
+        .tags-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .tag {
+            background-color: #eff6ff;
+            color: #2563eb;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .tag.category-tag {
+            background-color: #f3e8ff;
+            color: #7e22ce;
+        }
+        .card-content p {
+            margin: 4px 0;
+            font-size: 0.9rem;
+            color: #4b5563;
+        }
+        .meta-footer {
+            margin-top: auto;
+            padding-top: 12px;
+            border-top: 1px solid #f3f4f6;
+            font-size: 0.8rem;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Project Lost and Found</h1>
+        <p class="subtitle">Search and check status of reported items</p>
+    </header>
+
+    <div class="controls">
+        <input type="text" id="searchInput" class="search-input" placeholder="Search item, location, or finder...">
+        <select id="categoryFilter" class="filter-select">
+            <option value="All">All Categories</option>
+            <option value="Eletronic">Eletronic</option>
+            <option value="Clothing">Clothing</option>
+            <option value="Books">Books</option>
+            <option value="Other">Other</option>
+        </select>
+    </div>
+    
+    <div class="container" id="lost-found-container">
+        <p style="text-align: center; grid-column: 1/-1;">Loading lost & found data...</p>
+    </div>
+
+    <script>
+        const sheetUrl = 'https://script.google.com/macros/s/AKfycbxZyXTiE7Rmh4t5m9kHCka5E4LgKQlc2SoEXx9vnQJkMb0JD1vvjKxrhaOU-c_-05Wtyg/exec';
+        let allItems = [];
+
+        async function loadData() {
+            try {
+                const response = await fetch(sheetUrl);
+                allItems = await response.json();
+                renderItems(allItems);
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                document.getElementById('lost-found-container').innerHTML = 
+                    '<p style="text-align: center; grid-column: 1/-1; color: red;">Failed to load data from Google Sheets. (Check console logs, could be permission issue)</p>';
+            }
+        }
+
+        function renderItems(items) {
+            const container = document.getElementById('lost-found-container');
+            container.innerHTML = ''; 
+
+            if (items.length === 0) {
+                container.innerHTML = '<p style="text-align: center; grid-column: 1/-1;">No items found.</p>';
+                return;
+            }
+
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                
+                const statusClass = item.isClaimed ? 'status-claimed' : 'status-unclaimed';
+                const statusText = item.isClaimed ? '✅ Claimed' : '📦 Unclaimed';
+                const imgUrl = item.imageUrl || 'https://via.placeholder.com/300x200?text=No+Image';
+
+                // Format raw Google Sheets Date string if needed
+                const formattedDate = typeof item.date === 'string' && item.date.includes('T') 
+                    ? item.date.split('T')[0] 
+                    : item.date;
+
+                card.innerHTML = `
+                    <div class="status-badge ${statusClass}">${statusText}</div>
+                    <img src="${imgUrl}" alt="${item.itemName}" onerror="this.src='https://via.placeholder.com/300x200?text=Image+Error'">
+                    <div class="card-content">
+                        <h3 class="card-title">${item.itemName || 'Unnamed Item'}</h3>
+                        <div class="tags-row">
+                            <span class="tag">📍 ${item.location}</span>
+                            <span class="tag category-tag">🏷️ ${item.category}</span>
+                        </div>
+                        <p><strong>Found By:</strong> ${item.foundBy}</p>
+                        <p class="meta-footer">📅 Found Date: ${formattedDate}</p>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function filterData() {
+            const keyword = document.getElementById('searchInput').value.toLowerCase();
+            const selectedCategory = document.getElementById('categoryFilter').value;
+
+            const filtered = allItems.filter(item => {
+                const matchesKeyword = (item.itemName && item.itemName.toLowerCase().includes(keyword)) ||
+                                       (item.location && item.location.toLowerCase().includes(keyword)) || 
+                                       (item.foundBy && item.foundBy.toLowerCase().includes(keyword));
+                const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
+                
+                return matchesKeyword && matchesCategory;
+            });
+
+            renderItems(filtered);
+        }
+
+        document.getElementById('searchInput').addEventListener('input', filterData);
+        document.getElementById('categoryFilter').addEventListener('change', filterData);
+
+        loadData();
+        setInterval(loadData, 1200000)
+    </script>
+</body>
+</html>
